@@ -274,7 +274,7 @@ print(playerSerdes.des(cursor));
 Tuple types `LuaTuple<T>` are like arrays but without the table part, and each element can be a different type. Tuples cannot be used in table types, and cannot be nested in other tuples.
 
 ```ts
-const S = Squash;
+import S from "@rbxts/squash";
 
 const myTuple = S.tuple(
     S.Vector3(S.number(8)),
