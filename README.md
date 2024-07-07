@@ -222,14 +222,14 @@ playerSerdes.ser(cursor, {
     name: "Cedrick",
     poisoned: true,
     items: {
-        { name = 'Lantern', count = 2 },
-        { name = 'Waterskin', count = 1 },
-        { name = 'Map', count = 4 },
+        { name: 'Lantern', count: 2 },
+        { name: 'Waterskin', count = 1 },
+        { name: 'Map', count: 4 },
     },
     inns: {
-        ['The Copper Cauldron']: true,
+        'The Copper Cauldron': true,
         Infirmary: true,
-        ['His Recess']: true,
+        'His Recess': true,
     },
 });
 
