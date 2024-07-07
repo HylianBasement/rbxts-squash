@@ -45,13 +45,13 @@ Unsigned integers are whole numbers that can be serialized using 1 to 8 bytes.
 ```ts
 const cursor = Squash.cursor();
 
-Squash.uint(1).ser(cursor, 243)
-print(Squash.uint(1).des(cursor)) // 243
+Squash.uint(1).ser(cursor, 243);
+print(Squash.uint(1).des(cursor)); // 243
 ```
 
 ```ts
-Squash.uint(1).ser(cursor, -13)
-print(Squash.uint(1).des(cursor)) // 243
+Squash.uint(1).ser(cursor, -13);
+print(Squash.uint(1).des(cursor)); // 243
 ```
 
 > Using 7 or 8 bytes puts uints outside the 52 bit range of representation, leading to inaccurate results.
@@ -62,23 +62,23 @@ Signed Integers are Integers that can be serialized with 1 through 8 bytes:
 ```ts
 const cursor = Squash.cursor();
 
-Squash.int(1).ser(cursor, 127)
-print(Squash.int(1).des(cursor)) // 127
+Squash.int(1).ser(cursor, 127);
+print(Squash.int(1).des(cursor)); // 127
 ```
 
 ```ts
-Squash.int(1).ser(cursor, -127)
-print(Squash.int(1).des(cursor)) // -127
+Squash.int(1).ser(cursor, -127);
+print(Squash.int(1).des(cursor)); // -127
 ```
 
 ```ts
-Squash.int(1).ser(cursor, 128)
-print(Squash.int(1).des(cursor)) // -128
+Squash.int(1).ser(cursor, 128);
+print(Squash.int(1).des(cursor)); // -128
 ```
 
 ```ts
-Squash.int(1).ser(cursor, -128)
-print(Squash.int(1).des(cursor)) // -128
+Squash.int(1).ser(cursor, -128);
+print(Squash.int(1).des(cursor)); // -128
 ```
 
 > Using 7 or 8 bytes puts ints outside the 52 bit range of representation, leading to inaccurate results.
@@ -89,13 +89,13 @@ Floating Point Numbers are Rational Numbers that can be represented with either 
 ```ts
 const cursor = Squash.cursor();
 
-Squash.number(4).ser(cursor, 174302.923957475339573)
-print(Squash.number(4).des(cursor)) // 174302.921875
+Squash.number(4).ser(cursor, 174302.923957475339573);
+print(Squash.number(4).des(cursor)); // 174302.921875
 ```
 
 ```ts
-Squash.number(8).ser(cursor, -17534840302.923957475339573)
-print(Squash.number(8).des(cursor)) // 17534840302.923958
+Squash.number(8).ser(cursor, -17534840302.923957475339573);
+print(Squash.number(8).des(cursor)); // 17534840302.923958
 ```
 
 ### Strings
@@ -106,7 +106,7 @@ Squash.print(cursor);
 // Pos: 14 / 18
 // Buf: { 72 101 108 108 111 44 32 87 111 114 108 100 33 141 0 0 0 0 }
 //                                                           ^
-print(Squash.string().des(cursor))
+print(Squash.string().des(cursor));
 // Hello, World!
 ```
 
