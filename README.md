@@ -223,7 +223,7 @@ playerSerdes.ser(cursor, {
     poisoned: true,
     items: {
         { name: 'Lantern', count: 2 },
-        { name: 'Waterskin', count = 1 },
+        { name: 'Waterskin', count: 1 },
         { name: 'Map', count: 4 },
     },
     inns: {
