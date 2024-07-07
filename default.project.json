@@ -1,0 +1,6 @@
+{
+    "name": "Squash",
+    "tree": {
+        "$path": "src/init.luau"
+    }
+}
