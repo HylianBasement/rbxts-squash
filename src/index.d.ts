@@ -74,7 +74,7 @@ declare namespace Squash {
 		readonly datastore: Alphabet;
 	}
 
-	type AnySerDes = SerDes<any> | TupleSerDes<any> | BoolSerDes;
+	type AnySerDes = SerDes<any> | IOSerDes<any, any> | TupleSerDes<any> | BoolSerDes;
 
 	type Unpack<T> = {
 		[K in keyof T]: T[K] extends SerDes<infer U>
@@ -84,13 +84,21 @@ declare namespace Squash {
 			: never;
 	};
 
-	type SerDes<T, U = T> = {
+	type SerDes<T> = {
 		/** @hidden @deprecated */
 		readonly _nominal_serDes: unique symbol;
 
 		ser(this: void, cursor: Cursor, value: T): void;
-		des(this: void, cursor: Cursor): U;
-	}
+		des(this: void, cursor: Cursor): T;
+	};
+
+	type IOSerDes<I, O> = {
+		/** @hidden @deprecated */
+		readonly _nominal_ioSerDes: unique symbol;
+
+		ser(this: void, cursor: Cursor, input: I): void;
+		des(this: void, cursor: Cursor): O;
+	};
 
 	type TupleSerDes<T extends Array<any>> = {
 		/** @hidden @deprecated */
@@ -98,7 +106,7 @@ declare namespace Squash {
 
 		ser(this: void, cursor: Cursor, ...values: T): void;
 		des(this: void, cursor: Cursor): LuaTuple<T>;
-	}
+	};
 
 	type BoolSerDes = {
 		/** @hidden @deprecated */
@@ -117,7 +125,7 @@ declare namespace Squash {
 			b7?: boolean
 		): void;
 		des(this: void, cursor: Cursor): LuaTuple<[boolean, boolean, boolean, boolean, boolean, boolean, boolean, boolean]>;
-	}
+	};
 }
 
 // Util
@@ -192,7 +200,7 @@ declare namespace Squash {
 	export function Ray(serdes: SerDes<number>): SerDes<Ray>;
 
 	/** Returns a `SquashRaycastResult` because Roblox does not allow instantiating RaycastResults. */
-	export function RaycastResult(serdes: SerDes<number>): SerDes<RaycastResult, SquashRaycastResult>;
+	export function RaycastResult(serdes: SerDes<number>): IOSerDes<RaycastResult, SquashRaycastResult>;
 
 	export function Vector2(serdes: SerDes<number>): SerDes<Vector2>;
 
