@@ -1,6 +1,6 @@
 {
   "name": "@rbxts/squash",
-  "version": "2.0.0-ts.0",
+  "version": "2.0.0-ts.1",
   "description": "Typings for Squash",
   "main": "src/init.luau",
   "types": "src/index.d.ts",
