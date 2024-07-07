@@ -84,12 +84,12 @@ declare namespace Squash {
 			: never;
 	};
 
-	type SerDes<T> = {
+	type SerDes<T, U = T> = {
 		/** @hidden @deprecated */
 		readonly _nominal_serDes: unique symbol;
 
 		ser(this: void, cursor: Cursor, value: T): void;
-		des(this: void, cursor: Cursor): T;
+		des(this: void, cursor: Cursor): U;
 	}
 
 	type TupleSerDes<T extends Array<any>> = {
@@ -192,7 +192,7 @@ declare namespace Squash {
 	export function Ray(serdes: SerDes<number>): SerDes<Ray>;
 
 	/** Returns a `SquashRaycastResult` because Roblox does not allow instantiating RaycastResults. */
-	export function RaycastResult(serdes: SerDes<number>): SerDes<SquashRaycastResult>;
+	export function RaycastResult(serdes: SerDes<number>): SerDes<RaycastResult, SquashRaycastResult>;
 
 	export function Vector2(serdes: SerDes<number>): SerDes<Vector2>;
 
