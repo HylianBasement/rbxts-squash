@@ -74,38 +74,131 @@ declare namespace Squash {
 		readonly datastore: Alphabet;
 	}
 
-	type AnySerDes = SerDes<any> | IOSerDes<any, any> | TupleSerDes<any> | BoolSerDes;
+	type SquashCheckableTypes = Omit<CheckableTypes, "function" | "thread" | "nil">;
 
-	type Unpack<T> = {
-		[K in keyof T]: T[K] extends SerDes<infer U>
-			? U
-			: T[K] extends BoolSerDes
-			? boolean
-			: never;
+	type SquashTable<T extends keyof SquashCheckableTypes, U extends keyof SquashCheckableTypes> = MixedTable<
+		| SquashCheckableTypes[Exclude<T, "table">]
+		| MixedTable<SquashCheckableTypes[Exclude<U, "table">]>
+	>;
+
+	type MixedTable<T> = ReadonlyArray<T> | { [key: string | number]: T } | Map<T, T>;
+
+	type AnySerDesType =
+		| SerDes<any>
+		| IOSerDes<any>
+		| TableSerDes<any, any>
+		| StructSerDes<any>
+		| TupleSerDes<any>
+		| BoolSerDes;
+
+	type NonVariadicSerDesType = Exclude<AnySerDesType, TupleSerDes<any>>;
+
+	type InferValueType<T> = T extends SerDes<infer U>
+		? U
+		: T extends IOSerDes<infer U>
+		? IO<U>
+		: T extends StructSerDes<infer U>
+		? Reconstruct<ExcludeMembers<U, never>>
+		: T extends TableSerDes<infer U, infer V>
+		? SquashTable<U, V>
+		: T extends BoolSerDes
+		? boolean
+		: never;
+
+	interface IOSerDesMap {
+		RaycastResult: [RaycastResult, SquashRaycastResult];
+	}
+
+	type SerDesOfCheckableType<T extends keyof SquashCheckableTypes, U extends keyof SquashCheckableTypes> =
+		T extends "table"
+		? TableSerDes<U, never>
+		: T extends keyof IOSerDesMap
+		? IOSerDes<T>
+		: T extends "boolean"
+		? BoolSerDes
+		: SerDes<SquashCheckableTypes[T]>;
+
+	type Unpack<T> = _<{
+		[K in keyof T]: InferValueType<T[K]>;
+	}>;
+
+	type UnpackIO<T extends object, IOType extends boolean> = _<{
+		[K in keyof T]: T[K] extends IO<infer U>
+			? U extends keyof IOSerDesMap
+				? IOType extends false
+				? IOSerDesMap[U][0]
+				: IOSerDesMap[U][1]
+				: T[K]
+			: T[K];
+	}>;
+
+	type RemapFields<T extends object> = Reconstruct<UnionToIntersection<{
+		[K in keyof T]: T[K] extends Optional<infer U> ? { [_ in K]?: U } : { [_ in K]: T[K] };
+	}[keyof T]>>;
+
+	type RemapEntries<T extends Array<any>> = {
+		[K in keyof T]: T[K] extends Optional<infer U> ? U | undefined : T[K];
+	};
+
+	type Input<T extends object> = UnpackIO<T, false>;
+
+	type Output<T extends object> = UnpackIO<T, true>;
+
+	type IO<_> = {
+		/** @hidden @deprecated */
+		readonly _nominal_io: unique symbol;
+	};
+
+	type Optional<_> = {
+		/** @hidden @deprecated */
+		readonly _nominal_optional: unique symbol;
 	};
 
 	type SerDes<T> = {
 		/** @hidden @deprecated */
 		readonly _nominal_serDes: unique symbol;
+	} & (
+		T extends Optional<infer U>
+			? {
+				ser(this: void, cursor: Cursor, value?: U): void;
+				des(this: void, cursor: Cursor): U | undefined;
+			}
+			: {
+				ser(this: void, cursor: Cursor, value: T): void;
+				des(this: void, cursor: Cursor): T;
+			}
+	);
 
-		ser(this: void, cursor: Cursor, value: T): void;
-		des(this: void, cursor: Cursor): T;
-	};
-
-	type IOSerDes<I, O> = {
+	type IOSerDes<T extends keyof IOSerDesMap> = {
 		/** @hidden @deprecated */
 		readonly _nominal_ioSerDes: unique symbol;
 
-		ser(this: void, cursor: Cursor, input: I): void;
-		des(this: void, cursor: Cursor): O;
+		ser(this: void, cursor: Cursor, input: IOSerDesMap[T][0]): void;
+		des(this: void, cursor: Cursor): IOSerDesMap[T][1];
+	};
+
+	type TableSerDes<T extends keyof SquashCheckableTypes, U extends keyof SquashCheckableTypes> = {
+		/** @hidden @deprecated */
+		readonly _nominal_tableSerDes: unique symbol;
+
+		ser(this: void, cursor: Cursor, value: SquashTable<T, U>): void;
+		des(this: void, cursor: Cursor): SquashTable<T, U>;
+	};
+
+	type StructSerDes<T extends object> = {
+		/** @hidden @deprecated */
+		readonly _nominal_structSerDes: unique symbol;
+
+		ser(this: void, cursor: Cursor, value: RemapFields<Input<T>>): void;
+		des(this: void, cursor: Cursor): RemapFields<Output<T>>;
 	};
 
 	type TupleSerDes<T extends Array<any>> = {
 		/** @hidden @deprecated */
 		readonly _nominal_tupleSerDes: unique symbol;
 
-		ser(this: void, cursor: Cursor, ...values: T): void;
-		des(this: void, cursor: Cursor): LuaTuple<T>;
+		ser(this: void, cursor: Cursor, ...values: RemapEntries<Input<T>>): void;
+		des(this: void, cursor: Cursor): LuaTuple<RemapEntries<Output<T>>>;
 	};
 
 	type BoolSerDes = {
@@ -144,6 +237,8 @@ declare namespace Squash {
 declare namespace Squash {
 	export const string: SquashString;
 
+	export function char(): SerDes<string>;
+
 	export function boolean(): BoolSerDes;
 
 	export function uint(bytes: Bytes): SerDes<number>;
@@ -181,32 +276,32 @@ declare namespace Squash {
 
 	export function Font(): SerDes<Font>;
 
-	export function NumberRange(serdes: SerDes<number>): SerDes<NumberRange>;
+	export function NumberRange(serDes: SerDes<number>): SerDes<NumberRange>;
 
-	export function NumberSequenceKeypoint(serdes: SerDes<number>): SerDes<NumberSequenceKeypoint>;
+	export function NumberSequenceKeypoint(serDes: SerDes<number>): SerDes<NumberSequenceKeypoint>;
 
-	export function NumberSequence(serdes: SerDes<number>): SerDes<NumberSequence>;
+	export function NumberSequence(serDes: SerDes<number>): SerDes<NumberSequence>;
 
 	export function OverlapParams(): SerDes<OverlapParams>;
 
 	export function RaycastParams(): SerDes<RaycastParams>;
 
-	export function Vector3(serdes: SerDes<number>): SerDes<Vector3>;
+	export function Vector3(serDes: SerDes<number>): SerDes<Vector3>;
 
-	export function PathWaypoint(serdes: SerDes<number>): SerDes<PathWaypoint>;
+	export function PathWaypoint(serDes: SerDes<number>): SerDes<PathWaypoint>;
 
 	export function PhysicalProperties(): SerDes<PhysicalProperties>;
 
-	export function Ray(serdes: SerDes<number>): SerDes<Ray>;
+	export function Ray(serDes: SerDes<number>): SerDes<Ray>;
 
 	/** Returns a `SquashRaycastResult` because Roblox does not allow instantiating RaycastResults. */
-	export function RaycastResult(serdes: SerDes<number>): IOSerDes<RaycastResult, SquashRaycastResult>;
+	export function RaycastResult(serDes: SerDes<number>): IOSerDes<"RaycastResult">;
 
-	export function Vector2(serdes: SerDes<number>): SerDes<Vector2>;
+	export function Vector2(serDes: SerDes<number>): SerDes<Vector2>;
 
-	export function Rect(serdes: SerDes<number>): SerDes<Rect>;
+	export function Rect(serDes: SerDes<number>): SerDes<Rect>;
 
-	export function Region3(serdes: SerDes<number>): SerDes<Region3>;
+	export function Region3(serDes: SerDes<number>): SerDes<Region3>;
 
 	export function Region3int16(): SerDes<Region3int16>;
 
@@ -214,9 +309,9 @@ declare namespace Squash {
 
 	export function TweenInfo(): SerDes<TweenInfo>;
 
-	export function UDim(serdes: SerDes<number>): SerDes<UDim>;
+	export function UDim(serDes: SerDes<number>): SerDes<UDim>;
 
-	export function UDim2(serdes: SerDes<number>): SerDes<UDim2>;
+	export function UDim2(serDes: SerDes<number>): SerDes<UDim2>;
 
 	export function Vector2int16(): SerDes<Vector2int16>;
 
@@ -227,7 +322,7 @@ declare namespace Squash {
 declare namespace Squash {
 	export function vlq(): SerDes<number>;
 
-	export function angle(): SerDes<number>;
+	export function opt<T extends AnySerDesType>(serDes: T): SerDes<Optional<InferValueType<T>>>;
 }
 
 // Data structures
@@ -236,9 +331,17 @@ declare namespace Squash {
 
 	export function map<K, V>(keySerDes: SerDes<K>, valueSerDes: SerDes<V>): SerDes<Map<K, V>>;
 
-	export function record<T extends Record<string, AnySerDes>>(schema: T): SerDes<Reconstruct<ExcludeMembers<Unpack<T>, never>>>;
+	export function record<T extends Record<string, NonVariadicSerDesType>>(schema: T): StructSerDes<Unpack<T>>;
 
-	export function tuple<T extends Array<AnySerDes>>(...values: T): TupleSerDes<Unpack<T>>;
+	export function tuple<T extends Array<NonVariadicSerDesType>>(...values: T): TupleSerDes<Unpack<T>>;
+
+	/**
+	 * Serializes tables given a schema mapping types to serializers. If a type is not defined in the schema, it will be ignored when serializing tables.
+	 * **This is an expensive and heavy serializer compared to Record, Map, and Array. It is highly recommended that you do not use this for tables you know the type of already.**
+	 */
+	export function table<T extends keyof SquashCheckableTypes, U extends keyof SquashCheckableTypes>(
+		schema: { [K in T]: SerDesOfCheckableType<K, U> }
+	): TableSerDes<T, U>;
 }
 
 export = Squash;
