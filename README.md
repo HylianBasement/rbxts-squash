@@ -367,4 +367,4 @@ print(serdes.des(cursor));
 // }
 ```
 
-> You cannot use data types as indexes on objects because JavaScript doesn't allow you to do so. If needed, cast the value to a map instead.
+> You cannot use data types as indexes in objects because JavaScript doesn't allow you to do so. If needed, cast the value to a map instead.
