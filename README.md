@@ -98,6 +98,38 @@ Squash.number(8).ser(cursor, -17534840302.923957475339573);
 print(Squash.number(8).des(cursor)); // 17534840302.923958
 ```
 
+### Variable Length Quantities
+Sometimes we don't know how many bytes we need to represent a number, or we need to represent a number so large that 8 bytes isn't enough. This is where VLQs come in. They are a binary format to represent arbitrarily large numbers as a sequence of bytes.
+
+```ts
+const cursor = Squash.cursor();
+Squash.vlq().ser(cursor, 10);
+Squash.print(cursor);
+// Pos: 1 / 8
+// Buf: { 138 0 0 0 0 0 0 0 }
+//            ^
+print(Squash.vlq().des(cursor));
+// 10
+```
+```ts
+Squash.vlq().ser(cursor, 130);
+Squash.print(cursor);
+// Pos: 2 / 8
+// Buf: { 129 2 0 0 0 0 0 0 }
+//              ^
+print(Squash.vlq().des(cursor));
+// 130
+```
+```ts
+Squash.vlq().ser(cursor, 547359474);
+Squash.print(cursor);
+// Pos: 5 / 8
+// Buf: { 130 5 0 21 114 0 0 0 }
+//                       ^
+print(Squash.vlq().des(cursor));
+// 547359474
+```
+
 ### Strings
 ```ts
 const cursor = Squash.cursor();
@@ -209,10 +241,7 @@ const playerSerdes = record({
         count: vlq,
         name: str,
     })),
-    inns: map(
-        str,
-        bool
-    ),
+    inns: map(str, bool),
 });
 
 const cursor = Squash.cursor();
@@ -292,3 +321,50 @@ S.print(cursor);
 print(myTuple.des(cursor));
 // 123456792, 1, 0 1, 2, 3, 1, 0, 0, 0, 1, 0, 0, 0, 1 Medium stone grey Enum.HumanoidStateType.Freefall
 ```
+
+### Tables
+Luau tables are extremely versatile data structures that can and do implement every other kind of data structure one can think of. They are too versatile to optimally serialize in the general case, which is why Squash has the previously listed Array, Map, and Record serializers.
+
+Only use this serializer if you cannot guarantee the shape of your table beforehand, as it offers less control and worse size reduction.
+
+```ts
+const serdes = Squash.table({
+    number: Squash.number(8),
+    string: Squash.string(),
+    boolean: Squash.boolean(),
+    table: Squash.table({
+        CFrame: Squash.CFrame(Squash.number(4)),
+        Vector3: Squash.Vector3(Squash.int(2)),
+        number: Squash.vlq(),
+    }),
+});
+
+const cursor = Squash.cursor();
+serdes.ser(cursor, {
+    wow: -5.352345,
+    23846.4522: true,
+    12: "Gaming!",
+    tbl: {
+        1: CFrame.identity,
+        2: Vector3.zero,
+        3: 256,
+    },
+});
+Squash.print(cursor);
+// Pos: 131 / 135
+// Buf: { 71 97 109 105 110 103 33 135 1 0 2 240 162 175 32 205 104 21 192 0 119 111 119 131 1 1 2 208 68 216 240 156 73 215 64 0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 129 0 0 0 0 0 0 0 2 130 0 130 0 0 131 0 131 3 1 0 0 64 64 0 0 0 64 176 242 193 193 1 129 0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 130 0 233 255 11 255 98 1 2 131 0 129 127 0 0 0 0 0 0 0 2 1 0 0 0 0 0 2 228 0 133 3 132 0 0 0 0 }
+//                                                                                                                                                                                                                                                                                                                                                                           ^
+print(serdes.des(cursor));
+// {
+//     ["wow"] = -5.352345,
+//     [12] = "Gaming!",
+//     [23846.4522] = true,
+//     ["tbl"] =  ▼  {
+//         [1] = 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1,
+//         [2] = 0, 0, 0,
+//         [3] = 256
+//     }
+// }
+```
+
+> You cannot use data types as indexes in objects because JavaScript doesn't allow you to do so. If needed, cast the value to a map instead.

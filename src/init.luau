@@ -648,6 +648,47 @@ str.datastore = ' !#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_
 local str = setmetatable(str, stringMeta)
 Squash.string = str
 
+local charserdes: SerDes<string> = {
+	ser = function(cursor, char)
+		pushu1(cursor, string.byte(char))
+	end,
+
+	des = function(cursor)
+		return string.char(popu1(cursor))
+	end,
+}
+function Squash.char(): SerDes<string>
+	return charserdes
+end
+
+local optCache = {}
+function Squash.opt<T>(serdes: SerDes<T>): SerDes<T?>
+	if optCache[serdes] then
+		return optCache[serdes]
+	end
+
+	local optSerDes: SerDes<T?> = {
+		ser = function(cursor, x)
+			if x == nil then
+				pushu1(cursor, 0)
+			else
+				serdes.ser(cursor, x)
+				pushu1(cursor, 1)
+			end
+		end,
+
+		des = function(cursor)
+			if popu1(cursor) == 1 then
+				return serdes.des(cursor)
+			else
+				return nil
+			end
+		end,
+	}
+	optCache[serdes] = optSerDes
+	return optSerDes
+end
+
 local bufCache: SerDes<buffer> = {
 	ser = pushbuf,
 	des = popbuf,
@@ -670,21 +711,23 @@ local function array<T>(serdes: SerDes<T>): SerDes<{T}>
 		return arrayCache[serdes]
 	end
 
-	local ser, des = serdes.ser, serdes.des
+	local push, pop = serdes.ser, serdes.des
 
 	local arr: SerDes<{T}> = {
 		ser = function(cursor, xs)
+			local push = push
 			for _, x in xs do
-				ser(cursor, x)
+				push(cursor, x)
 			end
 			pushvlq(cursor, #xs)
 		end,
-		
+
 		des = function(cursor)
+			local pop = pop
 			local len = popvlq(cursor)
 			local xs = table.create(len)
 			for i = len, 1, -1 do
-				xs[i] = des(cursor)
+				xs[i] = pop(cursor)
 			end
 			return xs
 		end,
@@ -712,7 +755,7 @@ function Squash.tuple<T...>(...: T...): SerDes<T...>
 
 	function tuple.des(cursor: Cursor)
 		local xs = table.create(count)
-		for i = count, 1, -1 do 
+		for i = count, 1, -1 do
 			xs[i] = serdesargs[i].des(cursor)
 		end
 		return table.unpack(xs)
@@ -754,7 +797,7 @@ local function record<T>(schema: T & {}): SerDes<T>
 end
 Squash.record = record
 
-local function map<K, V>(keySerDes: K, valueSerDes: V): SerDes<{[K]: V}>
+local function map<K, V>(keySerDes: SerDes<K>, valueSerDes: SerDes<V>): SerDes<{[K]: V}>
 	return {
 		ser = function(cursor, map)
 			local count = 0
@@ -782,20 +825,63 @@ local function map<K, V>(keySerDes: K, valueSerDes: V): SerDes<{[K]: V}>
 end
 Squash.map = map
 
-local pushangle, popangle = uint(1).ser, uint(1).des
-local angleCache: SerDes<number> = {
-	ser = function(cursor, angle)
-		pushangle(cursor, angle * 128 / math.pi)
-	end,
+local function tableserdes(schema: { [string]: SerDes<any> }): SerDes<any>
+	local typemap = {}
 
-	des = function(cursor)
-		return popangle(cursor) * math.pi / 128
-	end,
-}
-local function angle(): SerDes<number>
-	return angleCache
+	for key, serdes in schema do
+		table.insert(typemap, key)
+	end
+
+	return {
+		ser = function(cursor, tab)
+			local size = 0
+			for k, v in tab :: any do
+				local vtype = typeof(v)
+				local vserdes = schema[vtype]
+				if not vserdes then
+					continue
+				end
+
+				local ktype = typeof(k)
+				local kserdes = schema[ktype]
+				if not kserdes then
+					continue
+				end
+
+				vserdes.ser(cursor, v)
+				local vid = table.find(typemap, vtype) or error(``)
+				pushu1(cursor, vid - 1)
+
+				kserdes.ser(cursor, k)
+				local kid = table.find(typemap, ktype) or error(``)
+				pushu1(cursor, kid - 1)
+
+				size += 1
+			end
+			pushvlq(cursor, size)
+		end,
+
+		des = function(cursor)
+			local tab = {}
+			local size = popvlq(cursor)
+			for _ = 1, size do
+				local kid = popu1(cursor) + 1
+				local ktype = typemap[kid]
+				local kserdes = schema[ktype]
+				local k = kserdes.des(cursor)
+
+				local vid = popu1(cursor) + 1
+				local vtype = typemap[vid]
+				local vserdes = schema[vtype]
+				local v = vserdes.des(cursor)
+
+				tab[k] = v
+			end
+			return tab
+		end,
+	}
 end
-Squash.angle = angle
+Squash.table = tableserdes
 
 local axesCache: SerDes<Axes> = {
 	ser = function(cursor, axes)
@@ -895,7 +981,7 @@ local catalogueSearchParamsCache: SerDes<CatalogSearchParams> = {
 			assetTypes[i] = enumitem(Enum.AssetType).des(cursor) :: Enum.AssetType
 		end
 		params.AssetTypes = assetTypes
-		
+
 		params.SalesTypesFilter = enumitem(Enum.SalesTypeFilter).des(cursor)
 		params.CategoryFilter = enumitem(Enum.CatalogCategoryFilter).des(cursor) :: Enum.CatalogCategoryFilter
 		params.SortAggregation = enumitem(Enum.CatalogSortAggregation).des(cursor)
@@ -967,15 +1053,15 @@ local function cframe(positionSerDes: SerDes<number>): SerDes<CFrame>
 			push(cursor, pos.Y)
 			push(cursor, pos.X)
 		end,
-	
+
 		des = function(cursor)
 			local pos = Vector3.new(pop(cursor), pop(cursor), pop(cursor))
-			
+
 			local specialId = popu1(cursor)
 			if specialId ~= 0 then
 				return idToCFrame[specialId] + pos
 			end
-	
+
 			local rotaxis = Vector3.new(popi2(cursor), popi2(cursor), popi2(cursor)) / 256
 			return CFrame.fromAxisAngle(rotaxis.Unit, rotaxis.Magnitude) + pos
 		end,
@@ -1072,7 +1158,7 @@ local facesCache: SerDes<Faces> = {
 function Squash.Faces(): SerDes<Faces>
 	return facesCache
 end
- 
+
 local floatCurveKeyCache: SerDes<FloatCurveKey> = {
 	ser = function(cursor, key)
 		enumitem(Enum.KeyInterpolationMode).ser(cursor, key.Interpolation)
@@ -1128,7 +1214,7 @@ local function numberrange(serdes: SerDes<number>): SerDes<NumberRange>
 			push(cursor, range.Max)
 			push(cursor, range.Min)
 		end,
-	
+
 		des = function(cursor)
 			return NumberRange.new(pop(cursor), pop(cursor))
 		end,
@@ -1394,13 +1480,13 @@ function Squash.Vector2(serdes: SerDes<number>): SerDes<Vector2>
 	end
 
 	local push, pop = serdes.ser, serdes.des
-	
+
 	local vec2: SerDes<Vector2> = {
 		ser = function(cursor, v)
 			push(cursor, v.Y)
 			push(cursor, v.X)
 		end,
-		
+
 		des = function(cursor)
 			return Vector2.new(pop(cursor), pop(cursor))
 		end,
@@ -1500,7 +1586,7 @@ function Squash.RotationCurveKey(positionSerDes: SerDes<number>): SerDes<Rotatio
 			push(cursor, key.Value)
 			pushf4(cursor, key.Time)
 		end,
-		
+
 		des = function(cursor)
 			return RotationCurveKey.new(
 				popf4(cursor),
@@ -1545,13 +1631,13 @@ function Squash.UDim(serdes: SerDes<number>): SerDes<UDim>
 	end
 
 	local push, pop = serdes.ser, serdes.des
-	
+
 	local udim: SerDes<UDim> = {
 		ser = function(cursor, u)
 			push(cursor, u.Offset)
 			push(cursor, u.Scale)
 		end,
-		
+
 		des = function(cursor)
 			return UDim.new(pop(cursor), pop(cursor))
 		end,
@@ -1568,7 +1654,7 @@ function Squash.UDim2(serdes: SerDes<number>): SerDes<UDim2>
 	end
 
 	local push, pop = serdes.ser, serdes.des
-	
+
 	local udim2: SerDes<UDim2> = {
 		ser = function(cursor, u)
 			push(cursor, u.Y.Offset)
@@ -1576,7 +1662,7 @@ function Squash.UDim2(serdes: SerDes<number>): SerDes<UDim2>
 			push(cursor, u.X.Offset)
 			push(cursor, u.X.Scale)
 		end,
-		
+
 		des = function(cursor)
 			return UDim2.new(pop(cursor), pop(cursor), pop(cursor), pop(cursor))
 		end,
@@ -1591,7 +1677,7 @@ local vector2int16Cache: SerDes<Vector2int16> = {
 		pushi2(cursor, v.Y)
 		pushi2(cursor, v.X)
 	end,
-	
+
 	des = function(cursor)
 		return Vector2int16.new(popi2(cursor), popi2(cursor))
 	end,
@@ -1606,7 +1692,7 @@ local vector3int16Cache: SerDes<Vector3int16> = {
 		pushi2(cursor, v.Y)
 		pushi2(cursor, v.X)
 	end,
-	
+
 	des = function(cursor)
 		return Vector3int16.new(popi2(cursor), popi2(cursor), popi2(cursor))
 	end,
