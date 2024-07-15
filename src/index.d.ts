@@ -100,7 +100,7 @@ declare namespace Squash {
 		: T extends StructSerDes<infer U>
 		? Reconstruct<ExcludeMembers<U, never>>
 		: T extends TableSerDes<infer U, infer V>
-		? SquashTable<U, V>
+		? SquashTable<U, V extends TableSerDes<infer W, infer _> ? W : never>
 		: T extends BoolSerDes
 		? boolean
 		: never;
@@ -109,9 +109,9 @@ declare namespace Squash {
 		RaycastResult: [RaycastResult, SquashRaycastResult];
 	}
 
-	type SerDesOfCheckableType<T extends keyof SquashCheckableTypes, U extends keyof SquashCheckableTypes> =
+	type SerDesOfCheckableType<T extends keyof SquashCheckableTypes, U> =
 		T extends "table"
-		? TableSerDes<U, never>
+		? Extract<U, TableSerDes<any, any>>
 		: T extends keyof IOSerDesMap
 		? IOSerDes<T>
 		: T extends "boolean"
@@ -177,12 +177,12 @@ declare namespace Squash {
 		des(this: void, cursor: Cursor): IOSerDesMap[T][1];
 	};
 
-	type TableSerDes<T extends keyof SquashCheckableTypes, U extends keyof SquashCheckableTypes> = {
+	type TableSerDes<T extends keyof SquashCheckableTypes, U> = {
 		/** @hidden @deprecated */
 		readonly _nominal_tableSerDes: unique symbol;
 
-		ser(this: void, cursor: Cursor, value: SquashTable<T, U>): void;
-		des(this: void, cursor: Cursor): SquashTable<T, U>;
+		ser(this: void, cursor: Cursor, value: SquashTable<T, U extends TableSerDes<infer V, infer _> ? V : never>): void;
+		des(this: void, cursor: Cursor): SquashTable<T, U extends TableSerDes<infer V, infer _> ? V : never>;
 	};
 
 	type StructSerDes<T extends object> = {
@@ -339,7 +339,7 @@ declare namespace Squash {
 	 * Serializes tables given a schema mapping types to serializers. If a type is not defined in the schema, it will be ignored when serializing tables.
 	 * **This is an expensive and heavy serializer compared to Record, Map, and Array. It is highly recommended that you do not use this for tables you know the type of already.**
 	 */
-	export function table<T extends keyof SquashCheckableTypes, U extends keyof SquashCheckableTypes>(
+	export function table<T extends keyof SquashCheckableTypes, U>(
 		schema: { [K in T]: SerDesOfCheckableType<K, U> }
 	): TableSerDes<T, U>;
 }
