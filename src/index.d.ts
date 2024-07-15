@@ -76,9 +76,15 @@ declare namespace Squash {
 
 	type NetworkableTypes = Omit<CheckableTypes, "function" | "thread" | "nil">;
 
-	type SquashTable<T extends keyof NetworkableTypes, U extends keyof NetworkableTypes> = MixedTable<
+	type GenericTable<T extends keyof NetworkableTypes, U> = MixedTable<
 		| NetworkableTypes[Exclude<T, "table">]
-		| MixedTable<NetworkableTypes[Exclude<U, "table">]>
+		| (
+			U extends TableSerDes<infer V, infer W>
+				? Extract<W, TableSerDes<any, any>> extends TableSerDes<any, any>
+				? GenericTable<V, W>
+				: MixedTable<NetworkableTypes[Exclude<V, "table">]>
+				: never
+		)
 	>;
 
 	type MixedTable<T> = ReadonlyArray<T> | { [key: string | number]: T } | Map<T, T>;
@@ -100,7 +106,7 @@ declare namespace Squash {
 		: T extends StructSerDes<infer U>
 		? Reconstruct<ExcludeMembers<U, never>>
 		: T extends TableSerDes<infer U, infer V>
-		? SquashTable<U, V extends TableSerDes<infer W, infer _> ? W : never>
+		? GenericTable<U, V>
 		: T extends BoolSerDes
 		? boolean
 		: never;
@@ -111,7 +117,7 @@ declare namespace Squash {
 
 	type SerDesOfCheckableType<T extends keyof NetworkableTypes, U> =
 		T extends "table"
-		? Extract<U, TableSerDes<any, any>>
+		? U
 		: T extends keyof IOSerDesMap
 		? IOSerDes<T>
 		: T extends "boolean"
@@ -190,8 +196,8 @@ declare namespace Squash {
 		/** @hidden @deprecated */
 		readonly _nominal_tableSerDes: unique symbol;
 
-		ser(this: void, cursor: Cursor, value: SquashTable<T, U extends TableSerDes<infer V, infer _> ? V : never>): void;
-		des(this: void, cursor: Cursor): SquashTable<T, U extends TableSerDes<infer V, infer _> ? V : never>;
+		ser(this: void, cursor: Cursor, value: GenericTable<T, U>): void;
+		des(this: void, cursor: Cursor): GenericTable<T, U>;
 	};
 
 	type StructSerDes<T extends object> = {
@@ -349,7 +355,7 @@ declare namespace Squash {
 	 */
 	export function table<T extends keyof NetworkableTypes, U>(
 		schema: { [K in T]: SerDesOfCheckableType<K, U> }
-	): TableSerDes<T, U>;
+	): TableSerDes<T, Extract<U, TableSerDes<any, any>>>;
 }
 
 export = Squash;
