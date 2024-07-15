@@ -14,8 +14,8 @@ declare namespace Squash {
 
 	/** An import of the Redblox Buffit Cursor type for better cross-library interaction */
 	export interface Cursor {
-		Buf: buffer;
-		Pos: number;
+		readonly Buf: buffer;
+		readonly Pos: number;
 	}
 
 	interface SquashRaycastResult {
