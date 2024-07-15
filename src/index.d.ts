@@ -26,7 +26,7 @@ declare namespace Squash {
 	}
 
 	interface SquashString {
-		(this: void): SerDes<string>;
+		(this: void, length?: number): SerDes<string>;
 
 		/** Converts a string, treated as a number in base `inAlphabet`, to a number in base `toAlphabet`.  */
 		convert(this: void, str: string, inAlphabet: Alphabet, toAlphabet: Alphabet): string;
@@ -144,6 +144,15 @@ declare namespace Squash {
 
 	type Output<T extends object> = UnpackIO<T, true>;
 
+	type IsAllowedFixedLength<N extends number> = `${N}` extends "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" ? true : false;
+
+	type FixedLengthArray<T, N extends number, O extends Array<T> = []> =
+		IsAllowedFixedLength<N> extends false
+			? T[]
+			: (O & { length: number })["length"] extends N
+			? O
+			: FixedLengthArray<T, N, [...O, T]>;
+
 	type IO<_> = {
 		/** @hidden @deprecated */
 		readonly _nominal_io: unique symbol;
@@ -237,8 +246,6 @@ declare namespace Squash {
 declare namespace Squash {
 	export const string: SquashString;
 
-	export function char(): SerDes<string>;
-
 	export function boolean(): BoolSerDes;
 
 	export function uint(bytes: Bytes): SerDes<number>;
@@ -247,7 +254,7 @@ declare namespace Squash {
 
 	export function number(bytes: FloatBytes): SerDes<number>;
 
-	export function buffer(): SerDes<buffer>;
+	export function buffer(length?: number): SerDes<buffer>;
 }
 
 // Datatypes
@@ -328,6 +335,7 @@ declare namespace Squash {
 // Data structures
 declare namespace Squash {
 	export function array<T>(serDes: SerDes<T>): SerDes<T[]>;
+	export function array<T, N extends number>(serDes: SerDes<T>, length: N): SerDes<FixedLengthArray<T, N>>;
 
 	export function map<K, V>(keySerDes: SerDes<K>, valueSerDes: SerDes<V>): SerDes<Map<K, V>>;
 
