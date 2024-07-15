@@ -340,10 +340,16 @@ declare namespace Squash {
 
 // Data structures
 declare namespace Squash {
-	export function array<T>(serDes: SerDes<T>): SerDes<T[]>;
-	export function array<T, N extends number>(serDes: SerDes<T>, length: N): SerDes<FixedLengthArray<T, N>>;
+	export function array<T extends NonVariadicSerDesType>(serDes: T): SerDes<Array<InferValueType<T>>>;
+	export function array<T extends NonVariadicSerDesType, N extends number>(
+		serDes: T,
+		length: N
+	): SerDes<FixedLengthArray<InferValueType<T>, N>>;
 
-	export function map<K, V>(keySerDes: SerDes<K>, valueSerDes: SerDes<V>): SerDes<Map<K, V>>;
+	export function map<K extends NonVariadicSerDesType, V extends NonVariadicSerDesType>(
+		keySerDes: K,
+		valueSerDes: V
+	): SerDes<Map<InferValueType<K>, InferValueType<V>>>;
 
 	export function record<T extends Record<string, NonVariadicSerDesType>>(schema: T): StructSerDes<Unpack<T>>;
 
