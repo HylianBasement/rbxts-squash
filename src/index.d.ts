@@ -74,11 +74,11 @@ declare namespace Squash {
 		readonly datastore: Alphabet;
 	}
 
-	type SquashCheckableTypes = Omit<CheckableTypes, "function" | "thread" | "nil">;
+	type NetworkableTypes = Omit<CheckableTypes, "function" | "thread" | "nil">;
 
-	type SquashTable<T extends keyof SquashCheckableTypes, U extends keyof SquashCheckableTypes> = MixedTable<
-		| SquashCheckableTypes[Exclude<T, "table">]
-		| MixedTable<SquashCheckableTypes[Exclude<U, "table">]>
+	type SquashTable<T extends keyof NetworkableTypes, U extends keyof NetworkableTypes> = MixedTable<
+		| NetworkableTypes[Exclude<T, "table">]
+		| MixedTable<NetworkableTypes[Exclude<U, "table">]>
 	>;
 
 	type MixedTable<T> = ReadonlyArray<T> | { [key: string | number]: T } | Map<T, T>;
@@ -109,14 +109,14 @@ declare namespace Squash {
 		RaycastResult: [RaycastResult, SquashRaycastResult];
 	}
 
-	type SerDesOfCheckableType<T extends keyof SquashCheckableTypes, U> =
+	type SerDesOfCheckableType<T extends keyof NetworkableTypes, U> =
 		T extends "table"
 		? Extract<U, TableSerDes<any, any>>
 		: T extends keyof IOSerDesMap
 		? IOSerDes<T>
 		: T extends "boolean"
 		? BoolSerDes
-		: SerDes<SquashCheckableTypes[T]>;
+		: SerDes<NetworkableTypes[T]>;
 
 	type Unpack<T> = _<{
 		[K in keyof T]: InferValueType<T[K]>;
@@ -186,7 +186,7 @@ declare namespace Squash {
 		des(this: void, cursor: Cursor): IOSerDesMap[T][1];
 	};
 
-	type TableSerDes<T extends keyof SquashCheckableTypes, U> = {
+	type TableSerDes<T extends keyof NetworkableTypes, U> = {
 		/** @hidden @deprecated */
 		readonly _nominal_tableSerDes: unique symbol;
 
@@ -347,7 +347,7 @@ declare namespace Squash {
 	 * Serializes tables given a schema mapping types to serializers. If a type is not defined in the schema, it will be ignored when serializing tables.
 	 * **This is an expensive and heavy serializer compared to Record, Map, and Array. It is highly recommended that you do not use this for tables you know the type of already.**
 	 */
-	export function table<T extends keyof SquashCheckableTypes, U>(
+	export function table<T extends keyof NetworkableTypes, U>(
 		schema: { [K in T]: SerDesOfCheckableType<K, U> }
 	): TableSerDes<T, U>;
 }
