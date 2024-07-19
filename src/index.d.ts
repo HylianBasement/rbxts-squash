@@ -182,12 +182,12 @@ declare namespace Squash {
         ? true
         : false;
 
-    type FixedLengthArray<T, N extends number, O extends Array<T> = []> =
+    type FixedLengthArray<T, N extends number, A extends Array<T> = [], O = []> =
         IsAllowedFixedLength<N> extends false
             ? T[]
-            : (O & { length: number })["length"] extends N
+            : (A & { length: number })["length"] extends N
               ? O
-              : FixedLengthArray<T, N, [...O, T]>;
+              : FixedLengthArray<T, N, [...A, T], O | [...A, T]>;
 
     type IO<_> = {
         /** @hidden @deprecated */
