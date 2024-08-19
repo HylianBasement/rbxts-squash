@@ -868,6 +868,26 @@ local function map<K, V>(keySerDes: SerDes<K>, valueSerDes: SerDes<V>): SerDes<{
 end
 Squash.map = map
 
+local function literal(...: any): SerDes<any>
+	local literals = { ... }
+	local lookup = {}
+
+	for i, literal in literals do
+		lookup[literal] = i - 1
+	end
+
+	return {
+		ser = function(cursor, literal)
+			pushu1(cursor, lookup[literal])
+		end,
+
+		des = function(cursor)
+			return literals[popu1(cursor) + 1]
+		end,
+	}
+end
+Squash.literal = literal
+
 local function tableserdes(schema: { [string]: SerDes<any> }): SerDes<any>
 	local typemap = {}
 

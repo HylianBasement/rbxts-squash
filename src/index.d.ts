@@ -434,6 +434,8 @@ declare namespace Squash {
     export function table<T extends keyof NetworkableTypes, U>(schema: {
         [K in T]: SerDesOfNetworkableType<K, U>;
     }): TableSerDes<T, Extract<U, TableSerDes<any, any>>>;
+
+    export function literal<const T extends Array<any>>(...values: T): SerDes<T[number]>;
 }
 
 export = Squash;
