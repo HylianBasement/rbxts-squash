@@ -15,7 +15,7 @@ declare namespace Squash {
     /** An import of the Redblox Buffit Cursor type for better cross-library interaction */
     export interface Cursor {
         readonly Buf: buffer;
-        readonly Pos: number;
+        Pos: number;
     }
 
     interface SquashString {
@@ -434,6 +434,8 @@ declare namespace Squash {
     export function table<T extends keyof NetworkableTypes, U>(schema: {
         [K in T]: SerDesOfNetworkableType<K, U>;
     }): TableSerDes<T, Extract<U, TableSerDes<any, any>>>;
+
+    export function literal<const T extends Array<any>>(...values: T): SerDes<T[number]>;
 }
 
 export = Squash;
