@@ -399,6 +399,8 @@ declare namespace Squash {
     export function opt<T extends NonOptionalSerDesType>(
         serDes: T,
     ): OptionalSerDes<InferValueType<T>>;
+
+    export function rotation(): SerDes<CFrame>;
 }
 
 // Data structures
