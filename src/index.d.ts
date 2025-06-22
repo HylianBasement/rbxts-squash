@@ -12,6 +12,8 @@ declare namespace Squash {
     /** The number of bytes used to represent a floating point number. */
     export type FloatBytes = 4 | 8;
 
+    export type Length = number | SerDes<number>;
+
     /** An import of the Redblox Buffit Cursor type for better cross-library interaction */
     export interface Cursor {
         readonly Buf: buffer;
@@ -297,6 +299,8 @@ declare namespace Squash {
 
     /** Pretty prints a Cursor record. */
     export function print(cursor: Cursor): string;
+
+    export function tryrealloc(cursor: Cursor, bytes: number): void;
 }
 
 // Primitives
@@ -312,6 +316,9 @@ declare namespace Squash {
     export function number(bytes: FloatBytes): SerDes<number>;
 
     export function buffer(length?: number): SerDes<buffer>;
+
+    /** Encodes an integer interval [min, max] using uints with as few bytes as possible */
+    export function range(min: number, max: number): SerDes<number>;
 }
 
 // Datatypes
@@ -405,13 +412,13 @@ declare namespace Squash {
 
 // Data structures
 declare namespace Squash {
-    export function array<T extends NonVariadicSerDesType>(
+    export function array<T extends NonVariadicSerDesType, N extends Length>(
         serDes: T,
-    ): SerDes<Array<InferValueType<T>>>;
-    export function array<T extends NonVariadicSerDesType, N extends number>(
-        serDes: T,
-        length: N,
-    ): SerDes<FixedLengthArray<InferValueType<T>, N>>;
+        length?: N,
+        ignoreBitpacking?: boolean,
+    ): N extends number
+        ? SerDes<FixedLengthArray<InferValueType<T>, N>>
+        : SerDes<InferValueType<T>>;
 
     export function map<
         K extends NonVariadicSerDesType,
@@ -419,6 +426,7 @@ declare namespace Squash {
     >(
         keySerDes: K,
         valueSerDes: V,
+        length?: Length,
     ): SerDes<Map<InferValueType<K>, InferValueType<V>>>;
 
     export function record<T extends Record<string, NonVariadicSerDesType>>(
@@ -433,9 +441,10 @@ declare namespace Squash {
      * Serializes tables given a schema mapping types to serializers. If a type is not defined in the schema, it will be ignored when serializing tables.
      * **This is an expensive and heavy serializer compared to Record, Map, and Array. It is highly recommended that you do not use this for tables you know the type of already.**
      */
-    export function table<T extends keyof NetworkableTypes, U>(schema: {
-        [K in T]: SerDesOfNetworkableType<K, U>;
-    }): TableSerDes<T, Extract<U, TableSerDes<any, any>>>;
+    export function table<T extends keyof NetworkableTypes, U>(
+        schema: { [K in T]: SerDesOfNetworkableType<K, U>; },
+        length?: Length,
+    ): TableSerDes<T, Extract<U, TableSerDes<any, any>>>;
 
     export function literal<const T extends Array<any>>(...values: T): SerDes<T[number]>;
 }
